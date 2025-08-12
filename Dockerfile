@@ -11,7 +11,8 @@ COPY package.json pnpm-lock.yaml ./
 
 # Install PNPM dependencies with existing flags (--frozen-lockfile and --prefer-offline)
 # Note: pnpm does not support a --no-cache flag
-RUN pnpm install --no-frozen-lockfile
+RUN pnpm install --no-frozen-lockfile --prefer-offline
+
 
 # Install additional dependencies
 RUN pnpm i @saleor/macaw-ui react-responsive-carousel
