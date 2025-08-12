@@ -1,0 +1,83 @@
+import { Button } from "@/checkout/components";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import useStore from "@/store/useStore";
+
+import { useCheckoutCompleteMutation, useTransactionInitializeMutation } from "@/checkout/graphql";
+import { useCheckout } from "@/checkout/hooks/useCheckout";
+import { useUser } from "@/checkout/hooks/useUser";
+import { useCheckoutValidationActions } from "@/checkout/state/checkoutValidationStateStore";
+import { useCheckoutUpdateStateActions } from "@/checkout/state/updateStateStore";
+
+export const DemoPayment = async () => {
+	const { checkout } = useCheckout();
+	const { authenticated } = useUser();
+	const { validateAllForms } = useCheckoutValidationActions();
+	const { setSubmitInProgress, setShouldRegisterUser } = useCheckoutUpdateStateActions();
+	const [__, mutation] = useTransactionInitializeMutation();
+	const [_, completeMutation] = useCheckoutCompleteMutation();
+
+	const { totalprice, product } = useStore();
+	const [paymentLink, setPaymentLink] = useState<string | null>(null); // Store the generated payment link
+	const [loading, setLoading] = useState<boolean>(false); // Loading state
+	const [error, setError] = useState<string | null>(null); // Error message
+	const router = useRouter();
+	const [currency, setCurrency] = useState("usd");
+
+	useEffect(() => {
+		if (paymentLink !== null) router.push(paymentLink);
+	}, [paymentLink]);
+
+	const handleSubmit = async () => {
+		try {
+			validateAllForms(authenticated);
+			setShouldRegisterUser(true);
+			setSubmitInProgress(true);
+			setPaymentLink(null);
+			const response = await fetch("/api/draft", {
+				method: "POST",
+				headers: {
+					"Content-Type": "application/json",
+				},
+				body: JSON.stringify({
+					products: product,
+					currency: currency,
+					totalprice: totalprice,
+				}), // Convert amount to cents
+			});
+
+			if (!response.ok) {
+				// Handle server errors
+				const errorData = await response.json();
+				throw new Error(errorData.error || "Failed to create payment link");
+			}
+
+			const data = await response.json();
+			setPaymentLink(data.link);
+
+			// setPaymentLink(data.url); // Store the payment link
+		} catch (err: any) {
+			setError(err.message || "Something went wrong");
+		} finally {
+			setLoading(false);
+		}
+	};
+
+	return (
+		<div>
+			<button onClick={handleSubmit}>
+				<Button label={"Pay"} />
+			</button>
+			<select
+				className="ml-2 h-10 w-fit rounded-md border border-neutral-300 bg-transparent bg-white px-4 py-2 pr-10 text-sm  placeholder:text-neutral-500 focus:border-black focus:ring-black"
+				onChange={(e) => setCurrency(e.target.value)}
+				value={currency}
+			>
+				<option value="USD">USD</option>
+				<option value="EUR">EUR</option>
+				<option value="AUD">AUD</option>
+				<option value="GBP">GBP</option>
+			</select>
+		</div>
+	);
+};
